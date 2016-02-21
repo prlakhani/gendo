@@ -131,11 +131,20 @@ class Gendo(object):
     def respond(self, user, message, channel):
         if not message:
             return
+
         elif message == 'gendo version':
             self.speak("Gendo v{0}".format(__version__), channel)
             return
+
         for rule, view_func, options, decorator_options in self.listeners:
-            if user != self.id and rule(user, channel, message):
+            ignore_channel_names = decorator_options.get('ignore_channels', [])
+            ignore_channels = {
+                self.get_channel_by_name(name) for name in ignore_channel_names
+            }
+            if channel in ignore_channels or user == self.id:
+                continue
+
+            elif rule(user, channel, message):
                 response = view_func(user, channel, message, **options)
                 if response:
                     if '{user.username}' in response:
