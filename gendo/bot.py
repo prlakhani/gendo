@@ -38,6 +38,22 @@ class Gendo(object):
             log.info("settings from %s loaded successfully", path_to_yaml)
             return cls(settings=settings)
 
+    @property
+    def id(self):
+        """Get id of the bot."""
+
+        if not hasattr(self, '_id',):
+            self._id = self.client.server.login_data['self']['id']
+        return self._id
+
+    @property
+    def username(self):
+        """Get username of the bot."""
+
+        if not hasattr(self, '_username',):
+            self._username = self.client.server.username
+        return self.username
+
     def _verify_rule(self, supplied_rule):
         """Rules must be callable with (user, message) in the signature.
         Strings are automatically converted to callables that match.
