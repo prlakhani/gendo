@@ -46,22 +46,23 @@ class Gendo(object):
         :raises ValueError: If `supplied_rule` is neither a string nor a
                             callable with the appropriate signature.
         """
+
         # If string, make a simple match callable
         if isinstance(supplied_rule, six.string_types):
-            return lambda user, message: supplied_rule in message.lower()
+            return lambda user, channel, message: supplied_rule in message.lower()
 
         if not six.callable(supplied_rule):
             raise ValueError('Bot rules must be callable or strings')
 
-        expected = ('user', 'message')
+        expected = ('user', 'channel', 'message')
         signature = tuple(inspect.getargspec(supplied_rule).args)
         try:
             # Support class- and instance-methods where first arg is
             # something like `self` or `cls`.
-            assert len(signature) in (2, 3)
-            assert expected == signature or expected == signature[-2:]
+            assert len(signature) in (3, 4)
+            assert expected == signature or expected == signature[-3:]
         except AssertionError:
-            msg = 'Rule signuture must have only 2 arguments: user, message'
+            msg = 'Rule signuture must have only 3 arguments: user, channel, message'
             raise ValueError(msg)
 
         return supplied_rule
@@ -116,8 +117,8 @@ class Gendo(object):
             self.speak("Gendo v{0}".format(__version__), channel)
             return
         for rule, view_func, options in self.listeners:
-            if rule(user, message):
-                response = view_func(user, message, **options)
+            if rule(user, channel, message):
+                response = view_func(user, channel, message, **options)
                 if response:
                     if '{user.username}' in response:
                         response = response.replace('{user.username}',
