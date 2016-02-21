@@ -135,7 +135,7 @@ class Gendo(object):
             self.speak("Gendo v{0}".format(__version__), channel)
             return
         for rule, view_func, options, decorator_options in self.listeners:
-            if rule(user, channel, message):
+            if user != self.id and rule(user, channel, message):
                 response = view_func(user, channel, message, **options)
                 if response:
                     if '{user.username}' in response:
