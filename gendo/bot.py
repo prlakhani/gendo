@@ -17,7 +17,7 @@ import six
 import yaml
 
 log = logging.getLogger(__name__)
-
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 Listener = namedtuple('Listener', ('rule', 'view_func', 'func_args', 'decorator_options'))
 
@@ -26,10 +26,12 @@ class Gendo(object):
     def __init__(self, slack_token=None, settings=None):
         self.settings = settings or {}
         self.listeners = []
+        self.handlers = {}
         self.scheduled_tasks = []
         self.client = SlackClient(
             slack_token or self.settings.get('gendo', {}).get('auth_token'))
         self.sleep = self.settings.get('gendo', {}).get('sleep') or 0.5
+        self._events = self._get_valid_events()
 
     @classmethod
     def config_from_yaml(cls, path_to_yaml):
@@ -83,6 +85,10 @@ class Gendo(object):
 
         return supplied_rule
 
+    def validate_event_name(self, event_name):
+        if event_name not in self._events:
+            raise ValueError('{} is not a valid event name.'.format(event_name))
+
     def listen_for(self, rule, **options):
         """Decorator for adding a Rule. See guidelines for rules.
         """
@@ -90,6 +96,20 @@ class Gendo(object):
         def decorator(f):
             def wrapped(**kwargs):
                 self.add_listener(rule, f, kwargs, options)
+                return f
+            wrapped()
+        return decorator
+
+    def handle_event(self, event_name, **options):
+        """Decorator for handling an event.
+
+        See https://api.slack.com/events for list of event names.
+
+        """
+        self.validate_event_name(event_name)
+        def decorator(f):
+            def wrapped(**kwargs):
+                self.add_handler(event_name, f, kwargs, options)
                 return f
             wrapped()
         return decorator
@@ -114,6 +134,10 @@ class Gendo(object):
                         message = data[0].get('text')
                         channel = data[0].get('channel')
                         self.respond(user, message, channel)
+
+                    elif data:
+                        event_name = data[0].get('type')
+                        self.handle(event_name, data[0])
 
                     for idx, task in enumerate(self.scheduled_tasks):
                         if now > task.next_run:
@@ -146,20 +170,17 @@ class Gendo(object):
 
             elif rule(user, channel, message):
                 response = view_func(user, channel, message, **options)
-                if response:
-                    if '{user.username}' in response:
-                        response = response.replace(
-                            '{user.username}', self.get_user_name(user)
-                        )
-                    if '{channel.name}' in response:
-                        response = response.replace(
-                            '{channel.name}', '<#{}>'.format(channel)
-                        )
-                    target_channel = decorator_options.get('target_channel')
-                    if target_channel is not None:
-                        channel = self.get_channel_by_name(target_channel)
-                    log.debug('target channel is {}'.format(channel))
-                    self.speak(response, channel)
+                if not response:
+                    continue
+                if '{user.username}' in response:
+                    response = response.replace('{user.username}', self.get_user_name(user))
+                if '{channel.name}' in response:
+                    response = response.replace('{channel.name}', '<#{}>'.format(channel))
+                target_channel = decorator_options.get('target_channel')
+                if target_channel is not None:
+                    channel = self.get_channel_by_name(target_channel)
+                log.debug('target channel is {}'.format(channel))
+                self.speak(response, channel)
 
     def add_listener(self, rule, view_func=None, func_args=None,
                      decorator_options=None):
@@ -174,6 +195,31 @@ class Gendo(object):
         if not six.callable(view_func):
             raise TypeError('view_func should be callable')
         self.listeners.append((rule, view_func, func_args, decorator_options))
+
+    def add_handler(self, event_name, f=None, args=None, decorator_options=None):
+        # FIXME: What?
+        handlers = self.handlers.setdefault(event_name, [])
+        handlers.append((f, args, decorator_options))
+
+    def handle(self, event_name, data):
+        handlers = self.handlers.get(event_name, [])
+        for function, args, decorator_options in handlers:
+            user, channel, response = function(data, **args)
+            if not response:
+                continue
+
+            if '{user.username}' in response:
+                response = response.replace('{user.username}', self.get_user_name(user))
+
+            if '{channel.name}' in response:
+                response = response.replace('{channel.name}', '<#{}>'.format(channel))
+
+            target_channel = decorator_options.get('target_channel')
+            if target_channel is not None:
+                channel = self.get_channel_by_name(target_channel)
+                log.debug('target channel is {}'.format(channel))
+
+            self.speak(response, channel)
 
     def add_cron(self, schedule, f, **options):
         self.scheduled_tasks.append(Task(schedule, f, **options))
@@ -195,3 +241,7 @@ class Gendo(object):
         """ Returns channel id by its name """
         channel = self.client.server.channels.find(channel_name)
         return channel.id
+
+    def _get_valid_events(self):
+        with open(os.path.join(HERE, 'events.json')) as f:
+            return set(json.load(f))
