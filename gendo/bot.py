@@ -54,7 +54,7 @@ class Gendo(object):
 
         if not hasattr(self, '_username',):
             self._username = self.client.server.username
-        return self.username
+        return self._username
 
     def _verify_rule(self, supplied_rule):
         """Rules must be callable with (user, message) in the signature.
