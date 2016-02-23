@@ -148,8 +148,13 @@ class Gendo(object):
                 response = view_func(user, channel, message, **options)
                 if response:
                     if '{user.username}' in response:
-                        response = response.replace('{user.username}',
-                                                    self.get_user_name(user))
+                        response = response.replace(
+                            '{user.username}', self.get_user_name(user)
+                        )
+                    if '{channel.name}' in response:
+                        response = response.replace(
+                            '{channel.name}', '<#{}>'.format(channel)
+                        )
                     target_channel = decorator_options.get('target_channel')
                     if target_channel is not None:
                         channel = self.get_channel_by_name(target_channel)
