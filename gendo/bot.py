@@ -137,7 +137,7 @@ class Gendo(object):
 
                     elif data:
                         event_name = data[0].get('type')
-                        self.handle(event_name, data[0])
+                        self.handle(event_name, dict(data[0]))
 
                     for idx, task in enumerate(self.scheduled_tasks):
                         if now > task.next_run:
