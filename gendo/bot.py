@@ -97,7 +97,7 @@ class Gendo(object):
             def wrapped(**kwargs):
                 self.add_listener(rule, f, kwargs, options)
                 return f
-            wrapped()
+            return wrapped()
         return decorator
 
     def handle_event(self, event_name, **options):
@@ -111,7 +111,7 @@ class Gendo(object):
             def wrapped(**kwargs):
                 self.add_handler(event_name, f, kwargs, options)
                 return f
-            wrapped()
+            return wrapped()
         return decorator
 
     def cron(self, schedule, **options):
