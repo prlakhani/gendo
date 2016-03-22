@@ -44,6 +44,9 @@ htmlcov/
 # TextMate
 .tm_properties
 
+# VIM
+*.sw*
+
 # Local env
 .envs
 
